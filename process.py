@@ -46,7 +46,9 @@ data = pd.read_csv("data.csv")
 new_data = []
 ps = []
 rs = ""
-for idx, row in data.iterrows():
+data["id"] = data["姓名"]
+for index, row in data.iterrows():
+    row["id"] = index
     name = row["姓名"]
     gender = row["性别"]
     nation = row["民族"]
@@ -87,12 +89,15 @@ for idx, row in data.iterrows():
                     x[i] = ''
             x = list(filter(lambda x: x, x))
             print(low, high, x)
-            new_data.append((name, low, high, x))
+            new_data.append((index, low, high, x))
             rs += p[1] + "。"
         except:
             pass
 
+data.to_csv("data1.csv")
+
 with open("link.csv", "w") as f:
+    print("time", "source", "target", "relativity", sep=',', file=f)
     for year in range(1957, 2018):
         for month in range(1, 13):
             place = year * 100 + month
@@ -104,7 +109,7 @@ with open("link.csv", "w") as f:
                 for name2, lb in have[idx+1:]:
                     ref_value = list_sim(la, lb)
                     if ref_value >= 0.2:
-                        print(place, name1.strip(), name2.strip(), round(ref_value, 3), sep=',', file=f)
+                        print(place, name1, name2, round(ref_value, 3), sep=',', file=f)
 
 
 print(sorted(ps))

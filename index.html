@@ -49,12 +49,43 @@
     stroke-width: 1.25px;
   }
 
+  .d3-tip {
+    line-height: 1.5;
+    font-weight: normal;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.8);
+    max-width: 250px;
+    color: #fff;
+    border-radius: 2px;
+  }
+
+  /* Creates a small triangle extender for the tooltip */
+  .d3-tip:after {
+    box-sizing: border-box;
+    display: inline;
+    font-size: 10px;
+    width: 100%;
+    line-height: 1;
+    color: rgba(0, 0, 0, 0.8);
+    content: "\25BC";
+    position: absolute;
+    text-align: center;
+  }
+
+  /* Style northward tooltips differently */
+  .d3-tip.n:after {
+    margin: -1px 0 0 0;
+    top: 100%;
+    left: 0;
+  }
+
   </style>
   <title>CS239 Assignment 5</title>
 </head>
-<body id="body" style="width:100%;height:100%;margin:0;">
+<body id="body" style="width:100%;height:100%;margin:0;overflow-y:hidden;">
   <svg height="100%" width="100%"></svg>
-  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://d3js.org/d3.v5.js"></script>
+  <script src="https://cdn.bootcss.com/d3-tip/0.9.0/d3-tip.js"></script>
   <script src="index.js"></script>
 </body>
 </html>
