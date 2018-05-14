@@ -1,9 +1,53 @@
+d3.selection.prototype.moveToFront = function () {
+  return this.each(function () {
+    this.parentNode.appendChild(this);
+  });
+};
+d3.selection.prototype.moveToBack = function () {
+  return this.each(function () {
+    var firstChild = this.parentNode.firstChild;
+    if (firstChild) {
+      this.parentNode.insertBefore(this, firstChild);
+    }
+  });
+};
+
+String.prototype.replaceAll = function (search, replacement) {
+  var target = this;
+  return target.split(search).join(replacement);
+};
+
+
 var width = document.getElementById("body").clientWidth;
 var height = document.getElementById("body").clientHeight;
 
 var svg = d3.select("svg")
   .attr("width", width)
   .attr("height", height);
+
+var watchListWidth = 200,
+  watchListHeight = 350;
+var watchListGroup = svg.append("g")
+  .attr("transform", "translate(" + (width - watchListWidth) + ",100)")
+  .attr("width", watchListWidth)
+  .attr("height", watchListHeight);
+watchListGroup.append("rect")
+  .attr("fill", "#fff")
+  .attr("opacity", 0.6)
+  .attr("width", watchListWidth)
+  .attr("height", watchListHeight);
+
+var expGroup = $("#exp");
+expGroup.css("background-color", "rgba(255,255,255,0.6)");
+expGroup.css("opacity", 0);
+$("#search").css("background-color", "rgba(255,255,255,0.6)");
+$("#search-button").on("click", function () {
+  var val = $("#search-select").val();
+  if (watchList.indexOf(val) == -1)
+    watchList.push(val);
+  updateWatchList();
+  return false;
+});
 
 var color = d3.scaleOrdinal(d3.schemeCategory10);
 var radius = 5;
@@ -24,7 +68,7 @@ var settings_time = 201701;
 var tip = d3.tip()
   .attr('class', 'd3-tip')
   .offset([-10, 0])
-  .html(function(d) {
+  .html(function (d) {
     return "<strong>姓名: </strong>" + d["姓名"] + "<br>" +
       "<strong>担任职务: </strong>" + d["担任职务"] + "<br>";
   });
@@ -32,6 +76,13 @@ var tip = d3.tip()
 d3.csv("data1.csv").then(function (data) {
   node_data = data;
   node_group.call(tip);
+
+  for (var i = 0; i < data.length; ++i) {
+    $("#search-select").append($('<option>', {
+      value: data[i].id,
+      text: data[i]["姓名"]
+    }));
+  }
 
   var node = node_group
     .selectAll("circle")
@@ -44,7 +95,16 @@ d3.csv("data1.csv").then(function (data) {
       .on("drag", dragged)
       .on("end", dragended))
     .on('mouseover', tip.show)
-    .on('mouseout', tip.hide);
+    .on('mouseout', tip.hide)
+    .on("click", function (d) {
+      var index = watchList.indexOf(d.id);
+      if (index > -1)
+        watchList.splice(index, 1);
+      else
+        watchList.push(d.id);
+      updateWatchList();
+    })
+    .style("cursor", "pointer");
 
   d3.csv("link.csv").then(buildGraph);
 });
@@ -61,10 +121,6 @@ function processLink(data) {
 
 function reset() {
   var localD = graph_data[settings_time];
-
-  console.log(settings_time);
-  console.log(localD);
-
   var link = link_group.selectAll("line").data(localD);
   link.exit().remove();
   link.enter().append("line");
@@ -103,10 +159,24 @@ function ticked() {
 
   node_group.selectAll("circle")
     .attr("cx", function (d) {
-      return d.x = Math.max(radius, Math.min(width - radius, d.x));
+      var err = parseInt(d.id) % 50;
+      return d.x = Math.max(radius + err, Math.min(width - radius - err, d.x));
     })
     .attr("cy", function (d) {
-      return d.y = Math.max(radius, Math.min(height - radius, d.y));
+      var err = parseInt(d.id) % 50;
+      return d.y = Math.max(radius + err, Math.min(height - radius - err, d.y));
+    })
+    .attr("fill", function (d) {
+      for (var i = 0; i < watchList.length; ++i)
+        if (d.id == watchList[i])
+          return color(i);
+      return "black";
+    })
+    .attr("r", function (d) {
+      for (var i = 0; i < watchList.length; ++i)
+        if (d.id == watchList[i])
+          return radius * 1.5;
+      return radius;
     });
 
   simulation.alpha(0.1).restart();
@@ -188,4 +258,58 @@ function createSlider() {
   }
 }
 
+var watchList = [];
+var highlighted = -1;
+
+function updateWatchList() {
+  var texts = watchListGroup.selectAll("g").data(watchList);
+  texts.exit().remove();
+  var new_texts = texts.enter().append("g");
+  new_texts.append("circle");
+  new_texts.append("text");
+  watchListGroup.selectAll("g")
+    .on("mouseover", function (d) {
+      highlighted = d;
+      updateExp();
+    })
+    .on("mouseout", function (d) {
+      highlighted = -1;
+      updateExp();
+    });
+  watchListGroup.selectAll("g")
+    .attr("transform", function (d, i) {
+      return "translate(0," + (30 * i + 30) + ")";
+    })
+    .attr("data-index", function (d, i) {
+      return i;
+    })
+    .selectAll("text")
+    .attr("x", 30)
+    .attr("dy", 20)
+    .attr("font-size", 18)
+    .text(function (d) {
+      return node_data[d]["姓名"];
+    });
+  watchListGroup.selectAll("g")
+    .selectAll("circle")
+    .attr("cx", 15)
+    .attr("cy", 15)
+    .attr("r", 8)
+    .attr("fill", function (d, i) {
+      return color(this.parentNode.getAttribute("data-index"));
+    });
+  watchListGroup.moveToFront();
+}
+
+function updateExp() {
+  if (highlighted >= 0) {
+    var text = node_data[highlighted]["履历"];
+    expGroup.html(text.replaceAll('\n', '<br>'));
+    expGroup.fadeTo(500, 1);
+  } else {
+    expGroup.fadeTo(500, 0);
+  }
+}
+
 createSlider();
+setTimeout(updateWatchList, 1000);
