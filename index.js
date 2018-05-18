@@ -17,6 +17,12 @@ String.prototype.replaceAll = function (search, replacement) {
   return target.split(search).join(replacement);
 };
 
+function convertLocalTimeToSettings(h) {
+  var year = Math.floor(h);
+  var month = Math.floor((h - year) * 12) + 1;
+  return year * 100 + month;
+}
+
 var width = document.getElementById("body").clientWidth;
 var height = document.getElementById("body").clientHeight;
 
@@ -65,8 +71,7 @@ var node_group = svg.append("g")
 var node_data, graph_data;
 var settings_time = 201701;
 var brushMode = false;
-var brushSelection = [201601, 201701];
-var brush_time_start = settings_time;
+var brushSelection = [2016, 2017];
 var tip = d3.tip()
   .attr('class', 'd3-tip')
   .offset([-10, 0])
@@ -122,7 +127,41 @@ function processLink(data) {
 }
 
 function reset() {
-  var localD = graph_data[settings_time];
+  var localD = [];
+  if (brushMode) {
+    var colorScale = d3.scaleSequential(d3.interpolateYlOrRd);
+    var func = {};
+    var maxRel = 0;
+    for (var i = brushSelection[0]; i <= brushSelection[1]; i += 1.0 / 12) {
+      if (graph_data.hasOwnProperty(convertLocalTimeToSettings(i))) {
+        var localE = graph_data[convertLocalTimeToSettings(i)];
+        for (var j = 0; j < localE.length; ++j) {
+          var source = localE[j].source;
+          var target = localE[j].target;
+          var st_key = source + "$" + target;
+          if (func.hasOwnProperty(st_key)) {
+            func[st_key][0] = (i - brushSelection[0]) / (brushSelection[1] - brushSelection[0]) * 1.5;
+            func[st_key][1] += +localE[j].relativity;
+          } else {
+            func[st_key] = [(brushSelection[1] - i) / (brushSelection[1] - brushSelection[0]) * 1.5, +localE[j].relativity];
+          }
+          maxRel = Math.max(maxRel, func[st_key][1]);
+        }
+      }
+    }
+    colorScale.domain([0, Math.log(maxRel)]);
+    for (var key in func) {
+      var ab = key.split("$");
+      localD.push({"source": ab[0], "target": ab[1], "relativity": func[key][0], "color": func[key][1]});
+    }
+    localD.sort(function (a, b) {
+      return a.color - b.color;
+    });
+    for (var i = 0; i < localD.length; ++i)
+      localD[i].color = colorScale(Math.log(localD[i].color));
+  } else {
+    localD = graph_data[settings_time];
+  }
   var link = link_group.selectAll("line").data(localD);
   link.exit().remove();
   link.enter().append("line");
@@ -157,6 +196,10 @@ function ticked() {
     })
     .attr("stroke-width", function (d) {
       return +d.relativity * 2;
+    })
+    .attr("stroke", function (d) {
+      if (brushMode && d.hasOwnProperty("color")) return d.color;
+      else return "#888";
     });
 
   node_group.selectAll("circle")
@@ -217,9 +260,9 @@ function createSlider() {
   function brushended() {
     if (!d3.event.sourceEvent) return; // Only transition after input.
     if (!d3.event.selection) return; // Ignore empty selections.
-    var d0 = d3.event.selection.map(x.invert);
-    brushSelection[0] = convertLocalTimeToSettings(d0[0]);
-    brushSelection[1] = convertLocalTimeToSettings(d0[1]);
+    brushSelection = d3.event.selection.map(x.invert);
+    brushMode = true;
+    reset();
   }
 
   slider.append("g")
@@ -270,12 +313,6 @@ function createSlider() {
     .attr("cx", x(2017))
     .attr("r", 9)
     .attr("opacity", 0);
-
-  function convertLocalTimeToSettings(h) {
-    var year = Math.floor(h);
-    var month = Math.floor((h - year) * 12) + 1;
-    return year * 100 + month;
-  }
 
   function onChange(h) {
     brushMode = false;
