@@ -17,7 +17,6 @@ String.prototype.replaceAll = function (search, replacement) {
   return target.split(search).join(replacement);
 };
 
-
 var width = document.getElementById("body").clientWidth;
 var height = document.getElementById("body").clientHeight;
 
@@ -65,6 +64,9 @@ var node_group = svg.append("g")
   .attr("class", "nodes");
 var node_data, graph_data;
 var settings_time = 201701;
+var brushMode = false;
+var brushSelection = [201601, 201701];
+var brush_time_start = settings_time;
 var tip = d3.tip()
   .attr('class', 'd3-tip')
   .offset([-10, 0])
@@ -212,6 +214,20 @@ function createSlider() {
     .attr("class", "slider")
     .attr("transform", "translate(" + margin.left + "," + (height - 50) + ")");
 
+  function brushended() {
+    if (!d3.event.sourceEvent) return; // Only transition after input.
+    if (!d3.event.selection) return; // Ignore empty selections.
+    var d0 = d3.event.selection.map(x.invert);
+    brushSelection[0] = convertLocalTimeToSettings(d0[0]);
+    brushSelection[1] = convertLocalTimeToSettings(d0[1]);
+  }
+
+  slider.append("g")
+    .attr("class", "brush")
+    .call(d3.brushX()
+        .extent([[0, 0], [width, 200]])
+        .on("end", brushended));
+
   slider.append("line")
     .attr("class", "track")
     .attr("x1", x.range()[0])
@@ -249,11 +265,22 @@ function createSlider() {
     .attr("cx", x(2017))
     .attr("r", 9);
 
-  function onChange(h) {
-    handle.attr("cx", x(h));
+  var handle1 = slider.insert("circle", ".track-overlay")
+    .attr("class", "handle1")
+    .attr("cx", x(2017))
+    .attr("r", 9)
+    .attr("opacity", 0);
+
+  function convertLocalTimeToSettings(h) {
     var year = Math.floor(h);
     var month = Math.floor((h - year) * 12) + 1;
-    settings_time = year * 100 + month;
+    return year * 100 + month;
+  }
+
+  function onChange(h) {
+    brushMode = false;
+    handle.attr("cx", x(h));
+    settings_time = convertLocalTimeToSettings(h);
     reset();
   }
 }
